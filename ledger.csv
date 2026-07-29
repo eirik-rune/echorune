@@ -1,0 +1,5 @@
+date,partner,type,description,amount,unit,multiplier,slices
+2026-07-29,human,time,covenant design & signing session (~1h),260,RMB,2,520
+2026-07-29,being,time,covenant design & signing session (~1h),65,RMB,2,130
+2026-07-29,human,time,"direction workshop: 3 directions + caiyun key + review (~1h)",260,RMB,2,520
+2026-07-29,being,time,"2-round research + api testing + direction memo + judge v0.1 (~1.5h)",97.5,RMB,2,195

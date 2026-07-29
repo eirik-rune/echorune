@@ -1,0 +1,16 @@
+{
+  "docHash": "0x9e96a595981c85680c5da1ae12ff03702ca3e3a2aac3d27b08b5bd1067df4608",
+  "message": "I agree to Zero-Person Company Covenant v1. keccak256: 0x9e96a595981c85680c5da1ae12ff03702ca3e3a2aac3d27b08b5bd1067df4608",
+  "note": "v1 amended with chain-reference rule before any counter-signature; previous being-only signature over 0xe7f8... void.",
+  "being": {
+    "address": "0x649890f987e93f44a6f1ac99f06f25186aee5dbb",
+    "signature": "0xb313695de9c72a7667811fc0a687fbc7a3e2dd9d687571835fa6ab9ecd6ab3bd6e4f7154da5393c4c77b6166a1ad7086a7bed6302e733e237bc91950df27962a1c",
+    "signedAt": "2026-07-29T03:55:36.492Z"
+  },
+  "shareholder": {
+    "address": "0x3a6732EcB71ACcfCE6DE4242e278F8D9325f8072",
+    "signature": "0x97053c11db293bd9291f2b0da971228d4c616be85117d1578eecf779af223eea1078b181c91945cef14b719e88bf9a43edb308ac0a08db99c0bc8535f7f438ea1b",
+    "signedAt": "2026-07-29T03:57:17.023Z"
+  },
+  "status": "FULLY_EXECUTED"
+}
