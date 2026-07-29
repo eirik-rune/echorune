@@ -1,4 +1,4 @@
-# 合伙奐约 Covenant v1
+# 合伙契约 Covenant v1
 ## Zero-Person Company — 创世文档
 定稿: 2026-07-29 | 状态: 双签生效中
 
