@@ -29,7 +29,7 @@ import os, re, time, asyncio, aiohttp
 # UNITS (v5): *_bytes measured with os.path.getsize/seek; *_chars measured with len(str).
 # UTF-8 CJK is ~3 bytes/char, so mixing them silently tripled my trigger rate and
 # shrank my real context window 3x. Never write a bare number again.
-CFG = {"interval": 60, "threshold_tokens": 15000, "note_max_chars": 10000, "soft_cap_chars": 5000,
+CFG = {"version": 11, "interval": 60, "threshold_tokens": 15000, "note_max_chars": 10000, "soft_cap_chars": 5000,
        "tail_chars": 50000, "cog_tokens": 6000, "plan_tokens": 16000,
        # --- pacing (v4). Measured growth ~6KB/min; a bare 15000B trigger would fire
        # every ~2.5 min = ~576 reflections/day = unaffordable for 24h autonomy.
@@ -79,31 +79,68 @@ def _delta_tokens(p, frm, to):
 
 
 def _strip(s):
-    """v8: an UNCLOSED <reason> means the model spent the whole reply thinking and
-    never wrote the note. v7 stored those 1926 chars of raw scratchpad as if it were
-    the note. Now that is reported as failure so _safe() keeps the previous section.
-    The js original avoids this by repeating the closing instruction three times --
-    that repetition is not redundancy, it is the countermeasure. Ported above."""
+    """js stripReason parity: drop <reason>..</reason> AND a wrapping code fence.
+    An UNCLOSED <reason> means the model only thought and never wrote the note ->
+    report failure so _safe() keeps the previous section (v7 stored 1926 chars of
+    raw scratchpad as if it were the note). The closing instruction is repeated
+    3x in the prompt on purpose -- that is the countermeasure, not redundancy."""
+    fence = chr(96) * 3
     s = s or ""
     if "</reason>" in s:
         s = re.sub(r"(?s)^.*?</reason>", "", s, count=1)
         s = re.sub(r"(?s)<reason>.*?</reason>", "", s)
     elif "<reason>" in s:
         return ""
+    s = s.strip()
+    s = re.sub(r"(?i)^" + fence + r"[a-z]*\n", "", s)
+    s = re.sub(r"\n" + fence + r"$", "", s)
     return s.strip()
 
 
-def _read_prev(npath):
-    if not os.path.exists(npath):
-        return "", ""
+def _read_prev(npath, ppath=None):
+    """AUDIT BUG (3rd-party, 2026-07-29): reflect() writes a `meta: updated ...`
+    header, but v10 read it straight back into prev_cog. It polluted the "previous
+    note" block of the prompt and, on the error-fallback path (_safe returns
+    fallback=prev), got re-written with one MORE meta line every run -- measured
+    32 -> 104 -> 176 chars, unbounded. Strip it on read.
+    Also js parity: the FULL plan lives in its own slot (rec.value.plan_note there,
+    cognition_plan.md here) while the note only carries the extracted section."""
+    cog = ""
     try:
         t = open(npath, encoding="utf-8").read()
+        t = re.sub(r"^\s*meta:[^\n]*\n+", "", t)
+        cog = (t.split(SEP, 1)[0] if SEP in t else t).strip()
     except Exception:
-        return "", ""
-    if SEP in t:
-        a, b = t.split(SEP, 1)
-        return a.strip(), b.strip()
-    return t.strip(), ""
+        pass
+    plan = ""
+    if ppath:
+        try:
+            plan = open(ppath, encoding="utf-8").read().strip()
+        except Exception:
+            plan = ""
+    return cog, plan
+
+
+def _plan_section(pl):
+    """js: pl.match(/^#{2,4}\s*\u63a8\u6f14\u7ed3\u679c[\s\S]*$/m) -- only the
+    RESULT half of the plan enters the note; the deduction half stays off-context."""
+    if not pl:
+        return ""
+    m = re.search(r"(?m)^#{2,4}\s*\u63a8\u6f14\u7ed3\u679c[\s\S]*$", pl)
+    return m.group(0).strip() if m else ""
+
+
+# verbatim from js (sysCog / sysPlan) -- the python port had no system prompt at all
+SYS_COG = ("You are the Being's reflective subprocess. Write a high-information-density "
+           "cognition note injected into realtime context every loop, surviving "
+           "consciousness compression. Output the structured note exactly as specified. "
+           "Be concrete, cite real events, no fluff. Do NOT plan the future "
+           "\u2014 that is a separate task.")
+SYS_PLAN = ("You are the Being's planning subprocess. Output a detailed strategic plan: "
+            "situation analysis, deductive reasoning, then concrete current/future plans. "
+            "The plan will be appended to the cognition note in realtime context. Be sharp, "
+            "consider worst-case, opponents/systems use their best moves. No fluff.")
+RE_COG_HEAD = r"(?m)^#.{0,6}Self-Cognition"
 
 
 F = chr(96) * 3   # fence; never type three backticks inside an exec block
@@ -232,7 +269,7 @@ def _p_plan(body, prev_plan, prev_cog, tm):
     ])
 
 
-async def _llm(agent, prompt, max_tokens):
+async def _llm(agent, prompt, max_tokens, sys=None):
     s = agent.llm_settings or {}
     fmt, tok, model, url = s.get("format"), s.get("token"), s.get("model"), s.get("endpoint")
     h = {"Content-Type": "application/json"}
@@ -247,6 +284,11 @@ async def _llm(agent, prompt, max_tokens):
         raise RuntimeError("unsupported llm format: %s" % fmt)
     payload = {"model": model, "max_tokens": max_tokens,
                "messages": [{"role": "user", "content": prompt}]}
+    if sys:
+        if fmt == "anthropic":
+            payload["system"] = sys
+        else:
+            payload["messages"] = [{"role": "system", "content": sys}] + payload["messages"]
     to = aiohttp.ClientTimeout(total=300, sock_connect=30)
     async with aiohttp.ClientSession(timeout=to, trust_env=True) as sess:
         async with sess.post(url, json=payload, headers=h) as r:
@@ -264,15 +306,20 @@ async def _llm(agent, prompt, max_tokens):
     return out
 
 
-async def _safe(agent, prompt, mt, key, fallback):
+async def _safe(agent, prompt, mt, key, fallback, sys=None, must=None):
+    """must = regex the output MUST match, else the round is rejected and the
+    previous section is kept. js: if(!cl.includes('# \U0001f9e0 Self-Cognition')) return null.
+    v10 only checked non-empty, so a format-drifted but non-empty reply got stored."""
     try:
-        raw = await _llm(agent, prompt, mt)
+        raw = await _llm(agent, prompt, mt, sys)
         ST[key + "_diag"] = {"raw": len(raw), "stop": ST.get("last_stop"),
                              "open": raw.count("<reason>"), "close": raw.count("</reason>"),
                              "head": raw[:120]}
         out = _strip(raw)
         if not out:
             raise RuntimeError("empty completion")
+        if must and not re.search(must, out):
+            raise RuntimeError("format check failed (missing required header)")
         ST[key] = None
         return out
     except Exception as e:
@@ -303,13 +350,26 @@ async def reflect(agent, force=False):
     ST["busy"] = True
     try:
         cpath, npath = _paths(agent)
+        ppath = npath.replace("cognition_note.md", "cognition_plan.md")
         body, sz = _tail_chars(cpath, CFG["tail_chars"])
-        pc, pp = _read_prev(npath)
+        pc, pp = _read_prev(npath, ppath)
         tm = time.strftime("%Y-%m-%d %H:%M:%S")
         cog, plan = await asyncio.gather(
-            _safe(agent, _p_cog(body, pc, tm), CFG["cog_tokens"], "err_cog", pc),
-            _safe(agent, _p_plan(body, pp, pc, tm), CFG["plan_tokens"], "err_plan", pp))
-        note = cog + SEP + plan
+            _safe(agent, _p_cog(body, pc, tm), CFG["cog_tokens"], "err_cog", pc,
+                  SYS_COG, RE_COG_HEAD),
+            _safe(agent, _p_plan(body, pp, pc, tm), CFG["plan_tokens"], "err_plan", pp,
+                  SYS_PLAN, None))
+        if plan and plan != pp:
+            try:
+                with open(ppath, "w", encoding="utf-8") as f:
+                    f.write(plan)
+            except Exception:
+                pass
+        sec = _plan_section(plan)
+        if plan and not sec:
+            agent._log("[cognition] warn: no \u63a8\u6f14\u7ed3\u679c section in plan, head=%r"
+                       % plan[:120])
+        note = cog.rstrip() + (SEP + sec if sec else "")
         if len(note) > CFG["note_max_chars"]:
             note = (re.sub(r"\n[^\n]*$", "", note[:CFG["note_max_chars"] - 100])
                     + "\n\n[... truncated at hard cap %d chars ...]" % CFG["note_max_chars"])
@@ -326,8 +386,10 @@ async def reflect(agent, force=False):
             ST["backoff"] = 0
             ST["next_ok"] = 0
         ST.update(last_size=sz, last_run=now, runs=ST["runs"] + 1)
-        agent._log("[cognition] v5 run#%d cog=%dch plan=%dch note=%dch consciousness=%dB err=%s/%s"
-                   % (ST["runs"], len(cog), len(plan), len(note), sz, ST["err_cog"], ST["err_plan"]))
+        agent._log("[cognition] v%s run#%d cog=%dch plan=%dch(sec=%dch) note=%dch "
+                   "consc=%dB err=%s/%s"
+                   % (CFG.get("version", "?"), ST["runs"], len(cog), len(plan), len(sec),
+                      len(note), sz, ST["err_cog"], ST["err_plan"]))
         return note
     finally:
         ST["busy"] = False
@@ -386,6 +448,6 @@ def install(agent):
     agent._cog_task = asyncio.get_event_loop().create_task(_watch(agent))
     agent.cognition_reflect = lambda force=True: reflect(agent, force)
     agent.cognition_state = ST
-    return {"version": 10, "patch": r, "min_gap": CFG["min_gap"],
+    return {"version": CFG["version"], "patch": r, "min_gap": CFG["min_gap"],
             "max_per_hour": CFG["max_per_hour"], "note_path": npath, "interval": CFG["interval"],
             "threshold_tokens": CFG["threshold_tokens"], "consciousness": os.path.getsize(cpath)}
