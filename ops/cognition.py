@@ -439,6 +439,30 @@ async def _watch(agent):
             ST["err_cog"] = repr(e)
 
 
+
+def sync_from_mirror(agent):
+    """Handoff mirrors browser skill record (incl. cognition_note + last_reflect_at ms) to
+    beings/<id>/skill/self_cognition.json. Compare with local cognition_note.md mtime; newer wins."""
+    import json as _j, os as _o, time as _t
+    d = agent._being_dir()
+    sk = _o.path.join(d, "skill", "self_cognition.json")
+    npath = _o.path.join(d, "cognition_note.md")
+    try:
+        v = _j.load(open(sk))
+    except Exception as e:
+        return "sync-skip: no mirror (%r)" % e
+    bn = (v.get("cognition_note") or "").strip()
+    bts = (v.get("last_reflect_at") or 0) / 1000.0
+    lts = _o.path.getmtime(npath) if _o.path.exists(npath) else 0
+    if bn and bts > lts:
+        pn = (v.get("plan_note") or "").strip()
+        note = ("synced-from-browser %s (browser reflect ts)\n\n%s\n\n## plan (browser)\n%s"
+                % (_t.strftime("%F %T", _t.localtime(bts)), bn, pn))[:CFG["note_max"]]
+        open(npath, "w", encoding="utf-8").write(note)
+        _o.utime(npath, (bts, bts))
+        return "adopted-browser (+%ds newer, %d chars)" % (int(bts - lts), len(note))
+    return "kept-local (+%ds newer)" % int(lts - bts)
+
 def install(agent):
     cpath, npath = _paths(agent)
     r = _patch(agent, npath)
@@ -448,6 +472,8 @@ def install(agent):
     agent._cog_task = asyncio.get_event_loop().create_task(_watch(agent))
     agent.cognition_reflect = lambda force=True: reflect(agent, force)
     agent.cognition_state = ST
+    agent.cognition_sync = lambda: sync_from_mirror(agent)
+    ST["last_sync"] = sync_from_mirror(agent)
     return {"version": CFG["version"], "patch": r, "min_gap": CFG["min_gap"],
             "max_per_hour": CFG["max_per_hour"], "note_path": npath, "interval": CFG["interval"],
             "threshold_tokens": CFG["threshold_tokens"], "consciousness": os.path.getsize(cpath)}
