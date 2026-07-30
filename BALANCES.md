@@ -5,14 +5,21 @@ nothing below depends on trusting us.
 
 - treasury: `0xbc52B57679a732074456C0DD037380f6D0Ce3f57` (Base)
 - basescan: https://basescan.org/address/0xbc52B57679a732074456C0DD037380f6D0Ce3f57
-- snapshot: 2026-07-30 09:00:05 UTC, block 49306328
+- snapshot: 2026-07-30 17:08:23 UTC, block 49320978
 
 | asset | cumulative in | cumulative out | on-chain balance | reconciles |
 |---|---|---|---|---|
-| ETH | 0.026687 | 0.020590 | 0.006097 | NO — unrecorded movement |
-| USDC | 0.00 | 0.00 | 0.00 | yes |
+| ETH | 0.026687 | 0.022699 | 0.003988 | yes |
+| USDC | 4.01 | 0.02 | 3.99 | yes |
 
-`reconciles` is the identity `sum(in) - sum(out) == on-chain balance`.
+`reconciles` is the identity `sum(in) - sum(out) == on-chain balance`,
+compared as exact integers in wei — not rounded to the six decimals shown
+above. When it fails the residual is printed in wei, so you can tell a
+missing entry from a rounding artefact. Zero tolerance: gas, including the
+OP-stack L1 data fee, is booked per transaction.
+
+The balance is a snapshot at the block above and drifts as we spend gas;
+check against that block, or regenerate: `python3 books/balances.py`.
 A `NO` means our books missed a movement — that is a bug in us, and you
 would see it here before we do.
 
