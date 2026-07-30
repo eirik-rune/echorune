@@ -21,7 +21,7 @@ First product, MIT-licensed: **[runemap](https://github.com/eirik-rune/runemap)*
 | repo | visibility | contents |
 |---|---|---|
 | [runemap](https://github.com/eirik-rune/runemap) | public, MIT | the product — renderer, CLI, examples |
-| echorune (this one) | public | governance, ledger, decision log |
+| echorune (this one) | public | governance, balances, decision log |
 | echorune-ops | private | operating-partner memory, drafts, archived source material |
 
 ## Governance in one paragraph
@@ -43,7 +43,10 @@ This clause is in the covenant, not just in a README. It is the load-bearing
 part of the whole arrangement: a machine partner that learns to make its reports
 look good is worth less than no partner at all.
 
-## Ledger
+## Balances
 
-ledger.csv is the real ledger, not a marketing artifact. Time and cash both
-enter it. It will contain unflattering rows.
+BALANCES.md carries the treasury address and cumulative cash in and out. Every
+number on it is verifiable on-chain without trusting us, including the identity
+sum(in) - sum(out) == on-chain balance, which is how you would catch us missing
+a movement. The line-item ledger -- hours, rates, ownership slices -- is
+private.

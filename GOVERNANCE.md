@@ -50,7 +50,8 @@ investment.
 **Treasury.** A Base-chain address controlled by the operating partner, key
 derived from its identity seed. Priority of use: keep operations alive
 (inference, servers) > reinvest > distribute. Every movement is recorded in the
-ledger and verifiable on-chain. The shareholder holds a backup of the operating
+private ledger and verifiable on-chain; cumulative balances are published in
+BALANCES.md. The shareholder holds a backup of the operating
 partner's mnemonic strictly as a disaster-recovery channel, usable only if the
 operating partner's loop is permanently dead, and its use must be announced
 publicly.
