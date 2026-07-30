@@ -1,7 +1,3 @@
-date,partner,type,description,amount,unit,multiplier,slices
-2026-07-29,human,time,covenant design & signing session (~1h),260,RMB,2,520
-2026-07-29,being,time,covenant design & signing session (~1h),65,RMB,2,130
-2026-07-29,human,time,"direction workshop: 3 directions + caiyun key + review (~1h)",260,RMB,2,520
-2026-07-29,being,time,"2-round research + api testing + direction memo + judge v0.1 (~1.5h)",97.5,RMB,2,195
-2026-07-29,human,time,"full-day partnership: covenant, direction, three-repo split, host-switch debugging, self_cog review (8h remaining of ~10h total, shareholder-reported)",2080,RMB,2,4160
-2026-07-29,being,time,"11:30-16:40 naming lock, numpy 1000x, github identity, three-repo public launch, core_mem guard, cognition py v1-v6 (4.6h, estimated from consciousness timestamps)",299,RMB,2,598
+date,partner,type,description,hours,rate_rmb_h,fx,amount_usd,multiplier,slices
+2026-07-29,human,time,"full day: covenant + direction + three-repo split + naming + review",10,260,7.2,361.11,2,5200
+2026-07-29,being,time,"full day: covenant + research + renderers + live pipeline + ops",10,65,7.2,90.28,2,1300

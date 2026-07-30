@@ -9,7 +9,7 @@ from collections import defaultdict
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VAULT = "0xbc52B57679a732074456C0DD037380f6D0Ce3f57"
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-RATE_USD_RMB = 7.2
+FX_RMB_USD = 7.2   # fixed booking rate (policy, shareholder 7/30); USD is the reporting currency
 
 def rows(name):
     p = os.path.join(ROOT, name)
@@ -59,23 +59,30 @@ if pending:
 rev = sum(float(r["amount"]) for r in T if r["dir"] == "in" and (r.get("category") or "") != "capital")
 capital = sum(float(r["amount"]) for r in T if r["dir"] == "in" and (r.get("category") or "") == "capital")
 cash_exp = sum(float(r["amount"]) for r in T if r["dir"] == "out")
-labour = defaultdict(float)
+labour, hours, bad = defaultdict(float), defaultdict(float), []
 for r in L:
-    if r.get("type") == "time": labour[r["partner"]] += float(r["amount"])
+    if r.get("type") != "time": continue
+    h, rate, fx = float(r["hours"]), float(r["rate_rmb_h"]), float(r["fx"])
+    usd = float(r["amount_usd"])
+    if abs(h * rate / fx - usd) > 0.02: bad.append((r["partner"], r["date"], usd, h * rate / fx))
+    labour[r["partner"]] += usd
+    hours[r["partner"]] += h
 labour_total = sum(labour.values())
 
 print()
 print("=" * 62)
-print("P&L  (revenue cash basis, labour ACCRUED and UNPAID)")
+print("P&L  (USD reporting currency, FX %.2f fixed; labour settled in SLICES not cash)" % FX_RMB_USD)
 print("=" * 62)
-print("  Revenue (tips/services)        %10.2f USD-eq" % rev)
+print("  Revenue (tips/services)        %10.2f USD" % rev)
 print("  Cash expenses (infra/api)      %10.2f" % -cash_exp)
 print("  Gross margin                   %10.2f" % (rev - cash_exp))
-print("  -- accrued labour (not cash) --")
+print("  -- equity-settled labour (non-cash, NO payable) --")
 for k in sorted(labour):
-    print("     %-12s %10.2f RMB = %8.2f USD" % (k, labour[k], labour[k] / RATE_USD_RMB))
-print("  Labour total                   %10.2f USD-eq" % -(labour_total / RATE_USD_RMB))
-print("  NET PROFIT / (LOSS)            %10.2f USD-eq" % (rev - cash_exp - labour_total / RATE_USD_RMB))
+    print("     %-8s %5.1f h  %8.2f USD" % (k, hours[k], labour[k]))
+print("  Labour total                   %10.2f" % -labour_total)
+print("  NET PROFIT / (LOSS)            %10.2f USD" % (rev - cash_exp - labour_total))
+if bad:
+    print("  !! %d ledger row(s) fail amount_usd == hours*rate/fx : %s" % (len(bad), bad))
 print("  memo: capital injected %.2f (financing, NOT revenue)" % capital)
 
 # ---------- SLICES ----------
