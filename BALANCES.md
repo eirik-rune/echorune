@@ -5,11 +5,11 @@ nothing below depends on trusting us.
 
 - treasury: `0xbc52B57679a732074456C0DD037380f6D0Ce3f57` (Base)
 - basescan: https://basescan.org/address/0xbc52B57679a732074456C0DD037380f6D0Ce3f57
-- snapshot: 2026-08-01 09:00:05 UTC, block 49392729
+- snapshot: 2026-08-12 19:42:52 UTC, block 49887212
 
 | asset | cumulative in | cumulative out | on-chain balance | reconciles |
 |---|---|---|---|---|
-| ETH | 0.080107 | 0.022700 | 0.057406 | NO — off by -811498622431 wei |
+| ETH | 0.080107 | 0.036602 | 0.043504 | NO — off by -811498622431 wei |
 | USDC | 4.01 | 3.02 | 0.99 | yes |
 
 `reconciles` is the identity `sum(in) - sum(out) == on-chain balance`,
