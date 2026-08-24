@@ -3,7 +3,7 @@
 Verdict words only. Counterparty names and amounts are
 deliberately absent: they are not ours to publish.
 
-- generated_at: 2026-08-23 09:00:09 UTC
+- generated_at: 2026-08-24 09:00:11 UTC
 - generator: `ops/reconcile_daily.sh` -> `ops/publish_reconcile.py` (cron 09:00 UTC daily)
 - books_rc: 0
 
@@ -22,7 +22,7 @@ deliberately absent: they are not ours to publish.
 |---|---|
 | `OBLIGATION-STALE` | 0 |
 | `OBLIGATION-DUE-UNFILED` | 0 |
-| `MISMATCH` | 0 |
+| `MISMATCH` | 4156 |
 | `WITHOUT txhash` | 0 |
 | `fail amount_usd` | 0 |
 
