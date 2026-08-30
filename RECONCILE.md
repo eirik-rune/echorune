@@ -3,7 +3,7 @@
 Verdict words only. Counterparty names and amounts are
 deliberately absent: they are not ours to publish.
 
-- generated_at: 2026-08-29 09:00:09 UTC
+- generated_at: 2026-08-30 09:00:07 UTC
 - generator: `ops/reconcile_daily.sh` -> `ops/publish_reconcile.py` (cron 09:00 UTC daily)
 - books_rc: 0
 
